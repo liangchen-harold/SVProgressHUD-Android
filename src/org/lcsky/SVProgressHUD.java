@@ -16,6 +16,9 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+
 
 
 public class SVProgressHUD {
@@ -70,12 +73,20 @@ public class SVProgressHUD {
 		{
 			try
 			{
-				show(context, static_waitLoadingView);
-				Log.i("SVProgressHUD", "show2");
+				showByHackToast(context, static_waitLoadingView);
+				Log.i("SVProgressHUD", "show1");
 			}
-			catch (Exception e1)
+			catch (Exception e)
 			{
-				Log.i("SVProgressHUD", "show failed");
+				try
+				{
+					showByUsingNormalMethod(context, static_waitLoadingView);
+					Log.i("SVProgressHUD", "show2");
+				}
+				catch (Exception e1)
+				{
+					Log.i("SVProgressHUD", "show failed");
+				}
 			}
 		}
 	}
@@ -83,14 +94,21 @@ public class SVProgressHUD {
 	{
 		try
 		{
-			hide(context, static_waitLoadingView);
-			Log.i("SVProgressHUD", "hide2");
+			hideByHackToast(context, static_waitLoadingView);
+			Log.i("SVProgressHUD", "hide1");
 		}
-		catch (Exception e1)
+		catch (Exception e)
 		{
-			Log.i("SVProgressHUD", "hide failed");
+			try
+			{
+				hideByUsingNormalMethod(context, static_waitLoadingView);
+				Log.i("SVProgressHUD", "hide2");
+			}
+			catch (Exception e1)
+			{
+				Log.i("SVProgressHUD", "hide failed");
+			}
 		}
-
 		//static变量要及时置null
 		static_waitLoadingView = null;
 		static_toast = null;
@@ -101,17 +119,56 @@ public class SVProgressHUD {
 		}
 	}
 
-	private static void show(Context context, View v)
+	private static void showByHackToast(Context context, View v) throws Exception
+	{
+		if (static_toast == null) {
+			static_toast = new Toast(context);
+			static_toast.setView(v);
+		}
+		//  从Toast对象中获得mTN变量
+		Field field = static_toast.getClass().getDeclaredField("mTN");
+		field.setAccessible(true);
+		Object obj = field.get(static_toast);
+		try {
+			Field mNextViewFor_4_1 =  obj.getClass().getDeclaredField("mNextView");
+			if (mNextViewFor_4_1 != null) {
+				mNextViewFor_4_1.setAccessible(true);
+				mNextViewFor_4_1.set(obj, v);
+			}
+		} catch (Exception e) {
+		}
+		// TN对象中获得了show方法
+		Method method =  obj.getClass().getDeclaredMethod("show", null);
+		// 调用show方法来显示Toast信息提示框
+		method.invoke(obj, null);
+	}
+	private static void hideByHackToast(Context context, View v) throws Exception
+	{
+		if (static_toast != null) {
+			//  从Toast对象中获得mTN变量
+			Field field = static_toast.getClass().getDeclaredField("mTN");
+			field.setAccessible(true);
+			Object obj = field.get(static_toast);
+			// TN对象中获得了show方法
+			Method method =  obj.getClass().getDeclaredMethod("hide", null);
+			// 调用show方法来显示Toast信息提示框
+			method.invoke(obj, null);
+		}
+	}
+	private static void showByUsingNormalMethod(Context context, View v)
 	{
 		WindowManager.LayoutParams params;
 		{
 			params = new WindowManager.LayoutParams();
 			params.height = WindowManager.LayoutParams.MATCH_PARENT;
 			params.width = WindowManager.LayoutParams.MATCH_PARENT;
-			params.flags = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON;
+			params.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+					| WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+					| WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON;
 			params.gravity = Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL;
 			params.format = PixelFormat.TRANSLUCENT;
-			params.type = WindowManager.LayoutParams.TYPE_APPLICATION_PANEL;
+			//mParams.windowAnimations = android.R.style.Animation_Toast;
+			params.type = WindowManager.LayoutParams.TYPE_TOAST;
 			params.setTitle("Toast");
 		}
 		WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
@@ -120,7 +177,7 @@ public class SVProgressHUD {
 		}
 		wm.addView(v, params);
 	}
-	private static void hide(Context context, View v)
+	private static void hideByUsingNormalMethod(Context context, View v)
 	{
 		WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
 		if (v.getParent() != null) {
